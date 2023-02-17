@@ -54,7 +54,8 @@ async fn process(mut socket: TcpStream, store: &StateMap) {
             break;
         }
 
-        // println!("{line:?}");
+        println!("{buf:?}");
+        println!("{line:?}");
 
         match line[2].to_lowercase().as_str() {
             "echo" => {
@@ -134,7 +135,7 @@ async fn process(mut socket: TcpStream, store: &StateMap) {
 }
 
 fn parse_stream(line: &[u8], l: usize) -> Vec<&str> {
-    let mut lines = vec![];
+    let mut lines =  Vec::new();
     let mut start = 0;
     let end = l - 1;
     for i in 0..end {
@@ -144,4 +145,19 @@ fn parse_stream(line: &[u8], l: usize) -> Vec<&str> {
         }
     }
 lines
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_parse_stream_ping() {
+      assert_eq!(parse_stream(b"*1\r\n$4\r\nping\r\n", 14), ["*1", "$4", "ping"]);
+  }
+
+  #[test]
+  fn test_parse_stream_echo() {
+      assert_eq!(parse_stream(b"*2\r\n$4\r\necho\r\n$5\r\nhello world\r\n", 31), ["*2", "$4", "echo", "$5", "hello world"]);
+  }
 }
