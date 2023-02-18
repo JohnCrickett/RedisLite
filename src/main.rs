@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::str;
 use std::sync::{Arc, RwLock};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
+use tokio::{task, time};
 
 use anyhow::Result;
 use tokio::{
@@ -9,20 +10,26 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
+pub mod db;
+use crate::db::{State, StateMap};
+
 const NULL_BULK_STRING: &str = "$-1\r\n";
 const OK_BULK_STRING: &str = "+OK\r\n";
 const PONG_BULK_STRING: &str = "+PONG\r\n";
 
-struct State {
-    value: String,
-    expiration: Option<u128>,
-}
-
-type StateMap = Arc<RwLock<HashMap<String, State>>>;
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let data_store: StateMap = Arc::new(RwLock::new(HashMap::new()));
+
+    // implement key expiry algorithm described in 'How Redis expires keys': https://redis.io/commands/expire/
+    let _key_expiry_task = task::spawn(async {
+        let mut interval = time::interval(Duration::from_millis(100));
+
+        loop {
+            interval.tick().await;
+            // run_expiry().await;
+        }
+    });
 
     let listener = TcpListener::bind("127.0.0.1:6379").await?;
 
@@ -32,7 +39,7 @@ async fn main() -> Result<()> {
                 let store = Arc::clone(&data_store);
 
                 tokio::spawn(async move {
-                    process(socket, &store).await;
+                    handle_client(socket, &store).await;
                 });
             }
             Err(err) => {
@@ -40,13 +47,19 @@ async fn main() -> Result<()> {
             }
         };
     }
+
+    // shutting down tokip:
+    // https://tokio.rs/tokio/topics/shutdown
+    // should be done on a clean shutdown
+    //key_expiry_task.await;
 }
 
-async fn process(mut socket: TcpStream, store: &StateMap) {
+async fn handle_client(mut socket: TcpStream, store: &StateMap) {
     let mut buf = [0; 512];
     loop {
+        // TODO handle input longer than 512 bytes
         let bytes_read = socket.read(&mut buf).await.unwrap();
-        let line = parse_stream(&buf, bytes_read);
+        let line = parse_message(&buf, bytes_read);
 
         if bytes_read == 0 {
             break;
@@ -124,6 +137,9 @@ async fn process(mut socket: TcpStream, store: &StateMap) {
                 let res = OK_BULK_STRING;
                 socket.write_all(res.as_bytes()).await.unwrap();
             }
+            "shutdown" => {
+                // send the shutdown message to initiate a clean shutdown
+            }
             _ => {
                 let res = "-Error Unknown command\r\n";
                 socket.write_all(res.as_bytes()).await.unwrap();
@@ -132,10 +148,11 @@ async fn process(mut socket: TcpStream, store: &StateMap) {
     }
 }
 
-fn parse_stream(line: &[u8], l: usize) -> Vec<&str> {
+fn parse_message(line: &[u8], length: usize) -> Vec<&str> {
     let mut lines = Vec::new();
     let mut start = 0;
-    let end = l - 1;
+    let end = length - 1;
+
     for i in 0..end {
         if line[i] == b'\r' && line[i + 1] == b'\n' {
             lines.push(str::from_utf8(&line[start..i]).unwrap());
@@ -150,18 +167,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_stream_ping() {
+    fn test_parse_message_ping() {
         assert_eq!(
-            parse_stream(b"*1\r\n$4\r\nping\r\n", 14),
+            parse_message(b"*1\r\n$4\r\nping\r\n", 14),
             ["*1", "$4", "ping"]
         );
     }
 
     #[test]
-    fn test_parse_stream_echo() {
+    fn test_parse_message_echo() {
         assert_eq!(
-            parse_stream(b"*2\r\n$4\r\necho\r\n$5\r\nhello world\r\n", 31),
+            parse_message(b"*2\r\n$4\r\necho\r\n$5\r\nhello world\r\n", 31),
             ["*2", "$4", "echo", "$5", "hello world"]
+        );
+    }
+
+    #[test]
+    fn test_parse_message_get() {
+        assert_eq!(
+            parse_message(b"*2\r\n$3\r\nget\r\n$3\r\nkey\r\n", 22),
+            ["*2", "$3", "get", "$3", "key"]
         );
     }
 }
