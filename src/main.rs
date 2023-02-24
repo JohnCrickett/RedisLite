@@ -22,14 +22,14 @@ async fn main() -> Result<()> {
     let data_store: StateMap = Arc::new(RwLock::new(HashMap::new()));
 
     // implement key expiry algorithm described in 'How Redis expires keys': https://redis.io/commands/expire/
-    let _key_expiry_task = task::spawn(async {
-        let mut interval = time::interval(Duration::from_millis(100));
+    // let _key_expiry_task = task::spawn(async {
+    //     let mut interval = time::interval(Duration::from_millis(100));
 
-        loop {
-            interval.tick().await;
-            // run_expiry().await;
-        }
-    });
+    //     loop {
+    //         interval.tick().await;
+    //         // run_expiry().await;
+    //     }
+    // });
 
     let listener = TcpListener::bind("127.0.0.1:6379").await?;
 
@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
 }
 
 async fn handle_client(mut socket: TcpStream, store: &StateMap) {
-    let mut buf = [0; 512];
+    let mut buf = [0; 8096];
     loop {
         // TODO handle input longer than 512 bytes
         let bytes_read = socket.read(&mut buf).await.unwrap();
@@ -65,8 +65,8 @@ async fn handle_client(mut socket: TcpStream, store: &StateMap) {
             break;
         }
 
-        println!("{buf:?}");
-        println!("{line:?}");
+        // println!("{buf:?}");
+        // println!("{line:?}");
 
         match line[2].to_lowercase().as_str() {
             "echo" => {
