@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::str;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, SystemTime};
-use tokio::{task, time};
+// use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
+// use tokio::{task, time};
 
 use anyhow::Result;
 use tokio::{
@@ -10,8 +11,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
-pub mod db;
-use crate::db::{State, StateMap};
+use redis_lite::{OrigState, OrigStateMap};
 
 const NULL_BULK_STRING: &str = "$-1\r\n";
 const OK_BULK_STRING: &str = "+OK\r\n";
@@ -19,7 +19,7 @@ const PONG_BULK_STRING: &str = "+PONG\r\n";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let data_store: StateMap = Arc::new(RwLock::new(HashMap::new()));
+    let data_store: OrigStateMap = Arc::new(RwLock::new(HashMap::new()));
 
     // implement key expiry algorithm described in 'How Redis expires keys': https://redis.io/commands/expire/
     // let _key_expiry_task = task::spawn(async {
@@ -54,7 +54,7 @@ async fn main() -> Result<()> {
     //key_expiry_task.await;
 }
 
-async fn handle_client(mut socket: TcpStream, store: &StateMap) {
+async fn handle_client(mut socket: TcpStream, store: &OrigStateMap) {
     let mut buf = [0; 8096];
     loop {
         // TODO handle input longer than 512 bytes
@@ -127,7 +127,7 @@ async fn handle_client(mut socket: TcpStream, store: &StateMap) {
                     });
                 store.write().unwrap().insert(
                     key,
-                    State {
+                    OrigState {
                         value,
                         expiration: expiry,
                     },
