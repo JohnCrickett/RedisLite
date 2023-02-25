@@ -1,34 +1,58 @@
 use bytes::Bytes;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-pub struct OrigState {
-    pub value: String,
-    pub expiration: Option<u128>,
+#[derive(Debug)]
+pub struct DbHandle {
+    db: Db,
 }
 
-pub type OrigStateMap = Arc<RwLock<HashMap<String, OrigState>>>;
-
-pub(crate) struct Db {
+#[derive(Debug, Clone)]
+pub struct Db {
     shared: Arc<SharedState>,
 }
 
+#[derive(Debug)]
 struct SharedState {
     state: Mutex<State>,
 }
 
+#[derive(Debug)]
 struct State {
     entries: HashMap<String, Entry>,
 }
 
+#[derive(Debug)]
 struct Entry {
     data: Bytes,
     expires_at: Option<Instant>,
 }
 
+impl Default for DbHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DbHandle {
+    pub fn new() -> DbHandle {
+        DbHandle { db: Db::new() }
+    }
+
+    pub fn db(&self) -> Db {
+        self.db.clone()
+    }
+}
+
+impl Default for Db {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Db {
-    pub(crate) fn new() -> Db {
+    pub fn new() -> Db {
         let shared = Arc::new(SharedState {
             state: Mutex::new(State {
                 entries: HashMap::new(),
@@ -37,7 +61,7 @@ impl Db {
         Db { shared }
     }
 
-    pub(crate) fn get(&self, key: &str) -> Option<Bytes> {
+    pub fn get(&self, key: &str) -> Option<Bytes> {
         let state = self.shared.state.lock().unwrap();
         let value = match state.entries.get(key) {
             None => None,
@@ -59,7 +83,7 @@ impl Db {
         value
     }
 
-    pub(crate) fn set(&self, key: String, value: Bytes, duration: Option<Duration>) {
+    pub fn set(&self, key: String, value: Bytes, duration: Option<Duration>) {
         let expires_at: Option<Instant> = duration.map(|d| Instant::now() + d);
 
         let mut state = self.shared.state.lock().unwrap();
