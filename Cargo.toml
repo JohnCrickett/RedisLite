@@ -2,6 +2,13 @@
 name = "redis-lite"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/JohnCrickett/RedisLite"
+description = """
+This is a very lite version of a Redis server built in Rust with Tokio.
+The intent of the project is to build a real-world application as part of learning Rust.
+"""
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

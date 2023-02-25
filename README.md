@@ -4,7 +4,7 @@ This is a very lite version of a [Redis](https://redis.io/) server built in [Rus
 The intent of the project is to build a real-world application as part of learning Rust.
 
 ## Why Redis
-learning Redis  and learning Rust have both been on my todo list for a while so it seemed like a good idea to combine the two.
+learning Redis and learning Rust have both been on my todo list for a while so it seemed like a good idea to combine the two.
 
 ## Running
 The Redis server can be run using:
